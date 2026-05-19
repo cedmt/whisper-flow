@@ -12,6 +12,18 @@ import numpy as np
 import sounddevice as sd
 import pyperclip
 import keyboard
+
+# Make CUDA DLLs from pip-installed nvidia-* packages discoverable BEFORE
+# importing faster_whisper / ctranslate2. Silently falls back to CPU if missing.
+if sys.platform == "win32":
+    try:
+        import nvidia.cublas.lib as _cublas_lib
+        import nvidia.cudnn.lib as _cudnn_lib
+        os.add_dll_directory(os.path.dirname(_cublas_lib.__file__))
+        os.add_dll_directory(os.path.dirname(_cudnn_lib.__file__))
+    except (ImportError, OSError):
+        pass
+
 from faster_whisper import WhisperModel
 
 from PIL import Image, ImageDraw
@@ -32,15 +44,29 @@ except (OSError, IOError):
     sys.exit(1)
 
 # --- Config ---
-MODEL_SIZE   = "medium"    # tiny | base | small | medium | large-v3
 HOTKEY       = "right alt"
 SAMPLE_RATE  = 16000
 LANGUAGE     = "en"        # set to None to auto-detect
-COMPUTE_TYPE = "int8"      # int8 = fastest on CPU with negligible accuracy loss
+
+# Auto-pick GPU + large-v3 if CUDA libs are installed, else CPU + medium.
+# Override manually by setting MODEL_SIZE / DEVICE / COMPUTE_TYPE below.
+def _autoconfig():
+    try:
+        import nvidia.cudnn.lib  # noqa: F401  (presence == GPU stack ready)
+        return ("large-v3", "cuda", "float16")
+    except ImportError:
+        return ("medium", "cpu", "int8")
+
+MODEL_SIZE, DEVICE, COMPUTE_TYPE = _autoconfig()
 # --------------
 
-print(f"Loading faster-whisper '{MODEL_SIZE}' model (first run downloads it)...")
-model = WhisperModel(MODEL_SIZE, device="cpu", compute_type=COMPUTE_TYPE)
+print(f"Loading faster-whisper '{MODEL_SIZE}' on {DEVICE} (first run downloads model)...")
+try:
+    model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
+except Exception as e:
+    print(f"{DEVICE.upper()} load failed ({e}); falling back to CPU + medium + int8.")
+    MODEL_SIZE, DEVICE, COMPUTE_TYPE = "medium", "cpu", "int8"
+    model = WhisperModel(MODEL_SIZE, device=DEVICE, compute_type=COMPUTE_TYPE)
 print(f"Ready. Hold [{HOTKEY.upper()}] to dictate into any app.\n")
 
 is_recording = False
@@ -83,7 +109,7 @@ def process_and_paste(frames):
         return
 
     pyperclip.copy(text)
-    time.sleep(0.1)
+    time.sleep(0.03)  # brief pause so focus returns to target app
     keyboard.press_and_release("ctrl+v")
 
 

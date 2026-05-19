@@ -1,0 +1,5 @@
+# Optional GPU acceleration via CUDA. ~1.2GB total.
+# install.bat installs these automatically if it detects an NVIDIA GPU.
+# Only useful if you have an NVIDIA card. AMD/Intel/integrated GPUs cannot use these.
+nvidia-cublas-cu12
+nvidia-cudnn-cu12

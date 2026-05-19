@@ -26,13 +26,30 @@ python --version
 echo.
 
 REM --- 2. Install dependencies ---
-echo Installing Python dependencies (this can take a few minutes)...
+echo Installing core Python dependencies (this can take a few minutes)...
 python -m pip install --upgrade pip >nul 2>nul
 python -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 (
     echo [ERROR] pip install failed. See errors above.
     pause
     exit /b 1
+)
+echo.
+
+REM --- 2b. Detect NVIDIA GPU and install CUDA libs if found ---
+echo Checking for NVIDIA GPU...
+where nvidia-smi >nul 2>nul
+if not errorlevel 1 (
+    echo NVIDIA GPU detected. Installing CUDA libraries for ~5-15x faster transcription...
+    echo This downloads ~1.2GB and may take a few minutes.
+    python -m pip install -r "%~dp0requirements-gpu.txt"
+    if errorlevel 1 (
+        echo [WARNING] GPU library install failed. Whisper will run on CPU.
+    ) else (
+        echo CUDA libraries installed. Whisper Flow will auto-use the GPU.
+    )
+) else (
+    echo No NVIDIA GPU detected. Running in CPU mode.
 )
 echo.
 

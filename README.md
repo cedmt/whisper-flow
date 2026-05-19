@@ -7,7 +7,8 @@ Runs 100% offline using [faster-whisper](https://github.com/SYSTRAN/faster-whisp
 ## Features
 
 - **System-wide hotkey.** Hold Right Alt anywhere — browser, Word, terminal, Discord — and dictate.
-- **Local transcription.** Whisper `medium` model with `int8` quantization. Good accuracy, ~1–3s latency on modern CPUs.
+- **Local transcription.** No data leaves your machine.
+- **Auto-configures GPU or CPU.** Detects an NVIDIA card and picks `large-v3` model at `float16` for near-instant transcription (~100-300ms). Falls back to `medium` + `int8` on CPU.
 - **System tray icon.** Right-click to quit.
 - **Single-instance lock.** Can't accidentally run two copies that double-paste.
 - **Auto-starts at login.** Installer drops a shortcut in your Startup folder.
@@ -61,10 +62,13 @@ Edit the constants near the top of [`whisper_flow.py`](whisper_flow.py):
 
 | Setting | Default | Notes |
 |---|---|---|
-| `MODEL_SIZE` | `"medium"` | `tiny` / `base` / `small` / `medium` / `large-v3`. Bigger = more accurate but slower. |
+| `MODEL_SIZE` | auto (`large-v3` on GPU, `medium` on CPU) | `tiny` / `base` / `small` / `medium` / `large-v3`. Bigger = more accurate but slower. |
+| `DEVICE` | auto (`cuda` if available, else `cpu`) | Force with `"cuda"` or `"cpu"`. |
+| `COMPUTE_TYPE` | auto (`float16` on GPU, `int8` on CPU) | `int8` (fastest CPU), `float16` (fastest GPU), `int8_float16` (lowest VRAM), `float32` (most accurate). |
 | `HOTKEY` | `"right alt"` | Any single key name [supported by the keyboard library](https://github.com/boppreh/keyboard#api). |
 | `LANGUAGE` | `"en"` | Set to `None` to auto-detect language. |
-| `COMPUTE_TYPE` | `"int8"` | `int8` (fastest CPU), `float16` (GPU), `float32` (slowest, most accurate). |
+
+To force a specific setup, replace the `_autoconfig()` call near the top of [`whisper_flow.py`](whisper_flow.py) with explicit values.
 
 After editing, restart via the tray icon or run `uninstall.bat` followed by `install.bat`.
 
