@@ -17,10 +17,14 @@ import keyboard
 # importing faster_whisper / ctranslate2. Silently falls back to CPU if missing.
 if sys.platform == "win32":
     try:
-        import nvidia.cublas.lib as _cublas_lib
-        import nvidia.cudnn.lib as _cudnn_lib
-        os.add_dll_directory(os.path.dirname(_cublas_lib.__file__))
-        os.add_dll_directory(os.path.dirname(_cudnn_lib.__file__))
+        import nvidia.cublas as _cublas
+        import nvidia.cudnn as _cudnn
+        # These are namespace packages; the DLLs live in <pkg>/bin (or directly in <pkg>).
+        for _pkg in (_cublas, _cudnn):
+            for _root in _pkg.__path__:
+                for _sub in (os.path.join(_root, "bin"), _root):
+                    if os.path.isdir(_sub):
+                        os.add_dll_directory(_sub)
     except (ImportError, OSError):
         pass
 
@@ -52,7 +56,7 @@ LANGUAGE     = "en"        # set to None to auto-detect
 # Override manually by setting MODEL_SIZE / DEVICE / COMPUTE_TYPE below.
 def _autoconfig():
     try:
-        import nvidia.cudnn.lib  # noqa: F401  (presence == GPU stack ready)
+        import nvidia.cudnn  # noqa: F401  (presence == GPU stack ready)
         return ("large-v3", "cuda", "float16")
     except ImportError:
         return ("medium", "cpu", "int8")
