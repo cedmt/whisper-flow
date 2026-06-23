@@ -5,6 +5,12 @@ Hold Right Alt to record, release to transcribe and paste anywhere.
 """
 
 import os
+
+# Quiet a noisy (harmless) Hugging Face warning on Windows, where symlinks
+# aren't available without Developer Mode/admin. The cache still works fine.
+# Must be set before huggingface_hub is imported (via faster_whisper below).
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+
 import sys
 import time
 import threading
@@ -25,6 +31,11 @@ if sys.platform == "win32":
                 for _sub in (os.path.join(_root, "bin"), _root):
                     if os.path.isdir(_sub):
                         os.add_dll_directory(_sub)
+                        # ctranslate2 loads cuBLAS lazily via LoadLibrary, which
+                        # does NOT search add_dll_directory() dirs but DOES search
+                        # PATH. Without this, encode() fails with
+                        # "cublas64_12.dll is not found or cannot be loaded".
+                        os.environ["PATH"] = _sub + os.pathsep + os.environ.get("PATH", "")
     except (ImportError, OSError):
         pass
 
@@ -48,7 +59,12 @@ except (OSError, IOError):
     sys.exit(1)
 
 # --- Config ---
-HOTKEY       = "right alt"
+# Right Alt is matched by SCAN CODE rather than name: on many Windows keyboard
+# layouts it reports as "alt gr" (not "right alt"), so name matching silently
+# fails. Scan code 541 is Right Alt / AltGr. Run diagnose_key.py to find the
+# scan code for a different key if you want to rebind.
+HOTKEY        = "right alt"   # display name only (tray tooltip / messages)
+HOTKEY_SCAN_CODE = 541        # physical key to match
 SAMPLE_RATE  = 16000
 LANGUAGE     = "en"        # set to None to auto-detect
 
@@ -120,7 +136,7 @@ def process_and_paste(frames):
 def on_key_event(e):
     global is_recording, audio_buffer
 
-    if e.name != HOTKEY:
+    if e.scan_code != HOTKEY_SCAN_CODE:
         return
 
     if e.event_type == keyboard.KEY_DOWN and not is_recording:

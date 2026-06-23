@@ -25,10 +25,31 @@ if errorlevel 1 (
 python --version
 echo.
 
-REM --- 2. Install dependencies ---
+REM --- 2. Create an isolated virtual environment ---
+REM Installing into a venv avoids permission errors when the system Python
+REM lives somewhere write-protected (e.g. C:\Python310) and keeps Whisper
+REM Flow's dependencies from disturbing your global Python.
+set "VENV_DIR=%~dp0.venv"
+set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
+set "PYTHONW=%VENV_DIR%\Scripts\pythonw.exe"
+
+if not exist "%VENV_PY%" (
+    echo Creating virtual environment in .venv ...
+    python -m venv "%VENV_DIR%"
+    if errorlevel 1 (
+        echo [ERROR] Failed to create virtual environment.
+        pause
+        exit /b 1
+    )
+) else (
+    echo Reusing existing virtual environment in .venv
+)
+echo.
+
+REM --- 2b. Install dependencies into the venv ---
 echo Installing core Python dependencies (this can take a few minutes)...
-python -m pip install --upgrade pip >nul 2>nul
-python -m pip install -r "%~dp0requirements.txt"
+"%VENV_PY%" -m pip install --upgrade pip >nul 2>nul
+"%VENV_PY%" -m pip install -r "%~dp0requirements.txt"
 if errorlevel 1 (
     echo [ERROR] pip install failed. See errors above.
     pause
@@ -36,13 +57,13 @@ if errorlevel 1 (
 )
 echo.
 
-REM --- 2b. Detect NVIDIA GPU and install CUDA libs if found ---
+REM --- 2c. Detect NVIDIA GPU and install CUDA libs if found ---
 echo Checking for NVIDIA GPU...
 where nvidia-smi >nul 2>nul
 if not errorlevel 1 (
     echo NVIDIA GPU detected. Installing CUDA libraries for ~5-15x faster transcription...
     echo This downloads ~1.2GB and may take a few minutes.
-    python -m pip install -r "%~dp0requirements-gpu.txt"
+    "%VENV_PY%" -m pip install -r "%~dp0requirements-gpu.txt"
     if errorlevel 1 (
         echo [WARNING] GPU library install failed. Whisper will run on CPU.
     ) else (
@@ -53,10 +74,9 @@ if not errorlevel 1 (
 )
 echo.
 
-REM --- 3. Detect pythonw.exe path ---
-for /f "delims=" %%i in ('python -c "import sys, os; print(os.path.join(os.path.dirname(sys.executable), 'pythonw.exe'))"') do set "PYTHONW=%%i"
+REM --- 3. Verify pythonw.exe exists in the venv ---
 if not exist "%PYTHONW%" (
-    echo [ERROR] Could not locate pythonw.exe next to python.exe.
+    echo [ERROR] Could not locate pythonw.exe in the virtual environment.
     echo Looked for: %PYTHONW%
     pause
     exit /b 1
