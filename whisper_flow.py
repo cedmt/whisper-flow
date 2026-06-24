@@ -128,7 +128,7 @@ def process_and_paste(frames):
     if not text:
         return
 
-    pyperclip.copy(text)
+    pyperclip.copy(text + ' ') # Add a space
     time.sleep(0.03)  # brief pause so focus returns to target app
     keyboard.press_and_release("ctrl+v")
 
